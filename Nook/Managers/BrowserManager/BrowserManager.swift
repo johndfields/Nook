@@ -371,6 +371,7 @@ class BrowserManager: ObservableObject {
     var splitManager: SplitViewManager
     var gradientColorManager: GradientColorManager
     var trackingProtectionManager: TrackingProtectionManager
+    var adBlockManager: AdBlockManager
     var findManager: FindManager
     var importManager: ImportManager
 
@@ -531,6 +532,7 @@ class BrowserManager: ObservableObject {
         self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
         self.trackingProtectionManager = TrackingProtectionManager()
+        self.adBlockManager = AdBlockManager()
         self.findManager = FindManager()
         self.importManager = ImportManager()
 
@@ -554,6 +556,10 @@ class BrowserManager: ObservableObject {
         self.gradientColorManager.setImmediate(.default)
         }
         self.trackingProtectionManager.attach(browserManager: self)
+        self.adBlockManager.attach(browserManager: self)
+        Task {
+            await self.adBlockManager.installRuleListIfNeeded()
+        }
         self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)

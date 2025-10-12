@@ -433,6 +433,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             // No ad-hoc page script injection here; rely on WKWebExtension
         }
 
+
+        // Apply ad blocking to new webview
+        if let webView = _webView {
+            browserManager?.adBlockManager.applyToWebView(webView, for: self)
+        }
         print("Created WebView for tab: \(name)")
         // Inform extensions that this tab's view is now open/available BEFORE loading,
         // so content scripts and messaging can resolve this tab during early document phases

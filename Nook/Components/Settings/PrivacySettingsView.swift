@@ -161,6 +161,35 @@ struct PrivacySettingsView: View {
             
             Divider()
             
+            // Ad Blocking Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Ad Blocking")
+                    .font(.headline)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Block Ads and Trackers", isOn: Binding(
+                        get: { browserManager.adBlockManager.isEnabled },
+                        set: { browserManager.adBlockManager.setEnabled($0) }
+                    ))
+                    
+                    Toggle("Aggressive Mode", isOn: Binding(
+                        get: { browserManager.adBlockManager.aggressiveMode },
+                        set: { browserManager.adBlockManager.setAggressiveMode($0) }
+                    ))
+                    .disabled(!browserManager.adBlockManager.isEnabled)
+                    
+                    Text("Blocks ads, trackers, and malware using comprehensive filter lists. Aggressive mode includes additional tracking protection.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding()
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(8)
+            }
+            
+            Divider()
+            
             // Website Data Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("Website Data")
