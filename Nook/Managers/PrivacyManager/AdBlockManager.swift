@@ -2,8 +2,12 @@
 //  AdBlockManager.swift
 //  Nook
 //
-//  Comprehensive ad blocking using popular filter lists
-//  Similar to Brave's built-in ad blocker
+//  Comprehensive ad blocking focusing on intrusive ads and ad networks.
+//  Works alongside TrackingProtectionManager (which handles analytics/tracking).
+//  
+//  COORDINATION: Both managers add their own WKContentRuleList to webviews.
+//  We avoid calling removeAllContentRuleLists() to prevent conflicts.
+//  WebKit supports multiple rule lists running simultaneously.
 //
 
 import Foundation
@@ -170,68 +174,84 @@ final class AdBlockManager {
         return "[]"
     }
     
-    // Standard mode: Most common ad networks and trackers
+    // Standard mode: Ad-specific domains (avoiding duplication with TrackingProtectionManager)
+    // TrackingProtectionManager already handles: google-analytics, googletagmanager, doubleclick,
+    // facebook.net, hotjar, segment, mixpanel, sentry, optimizely, newrelic, clarity
     private var standardAdDomains: [String] {
         return [
-            // Google Ads & Analytics
-            "doubleclick\\.net",
+            // Google Ads (not covered by TrackingProtectionManager)
             "googlesyndication\\.com",
             "googleadservices\\.com",
-            "google-analytics\\.com",
-            "googletagmanager\\.com",
             "googletagservices\\.com",
             "pagead2\\.googlesyndication\\.com",
-            "adservice\\.google\\.com",
+            "googlesyndication\\.com/safeframe",
+            "tpc\\.googlesyndication\\.com",
             
-            // Facebook
-            "facebook\\.net",
-            "connect\\.facebook\\.net",
+            // Facebook Ads (tracking is covered, but not all ad pixels)
             "facebook\\.com/tr",
+            "facebook\\.com/plugins/like",
             
             // Major Ad Networks
-            "adsystem\\.com",
             "amazon-adsystem\\.com",
             "advertising\\.com",
+            "media\\.net",
+            "advertising\\.yahoo\\.com",
             
-            // Trackers
-            "hotjar\\.com",
-            "segment\\.io",
-            "cdn\\.segment\\.com",
-            "mixpanel\\.com",
-            "optimizely\\.com",
-            "clarity\\.ms",
+            // Video Ads
+            "imasdk\\.googleapis\\.com",
+            "doubleclick\\.net/instream",
+            "pubads\\.g\\.doubleclick\\.net",
+            
+            // Pop-ups and Malware
+            "pop\\.ads\\.net",
+            "popads\\.net",
+            "popcash\\.net",
         ]
     }
     
-    // Aggressive mode: Extended list
+    // Aggressive mode: Extended list with more intrusive ad networks
     private var allAdDomains: [String] {
         return standardAdDomains + [
-            // Additional Ad Networks
+            // Content Recommendation Networks (often intrusive)
             "taboola\\.com",
             "outbrain\\.com",
+            "revcontent\\.com",
+            "mgid\\.com",
+            "disqus\\.com/recommendations",
+            
+            // Programmatic Ad Exchanges
             "adnxs\\.com",
             "criteo\\.com",
             "pubmatic\\.com",
             "rubiconproject\\.com",
             "openx\\.net",
+            "contextweb\\.com",
+            "casalemedia\\.com",
+            "indexexchange\\.com",
             
-            // Social Trackers
+            // Social Media Ad Pixels (aggressive)
             "twitter\\.com/i/adsct",
             "linkedin\\.com/px",
             "reddit\\.com/api/v1/pixel",
             "pinterest\\.com/ct",
             "tiktok\\.com/i18n/pixel",
+            "snapchat\\.com/web-pixel",
             
-            // Analytics
+            // Retargeting & Attribution
             "amplitude\\.com",
             "heap\\.io",
             "fullstory\\.com",
             "logrocket\\.com",
             "quantserve\\.com",
             "scorecardresearch\\.com",
-            "newrelic\\.com",
-            "sentry\\.io",
             "mouseflow\\.com",
+            "branch\\.io",
+            "adjust\\.com",
+            
+            // Native Advertising
+            "nativo\\.com",
+            "adyoulike\\.com",
+            "triplelift\\.com",
         ]
     }
     
@@ -255,6 +275,9 @@ final class AdBlockManager {
             return
         }
         
+        // IMPORTANT: Do NOT call removeAllContentRuleLists() here!
+        // That would wipe out TrackingProtectionManager's rules.
+        // WebKit supports multiple WKContentRuleLists, so we can safely add ours.
         if isEnabled, let ruleList = adBlockRuleList {
             ucc.add(ruleList)
         }
@@ -317,4 +340,3 @@ final class AdBlockManager {
         return blockedCountsByTab.values.reduce(0, +)
     }
 }
-
