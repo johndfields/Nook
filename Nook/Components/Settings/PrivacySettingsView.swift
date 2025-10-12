@@ -145,7 +145,7 @@ struct PrivacySettingsView: View {
                     // Activated: Block cross‑site tracking via content rules + iframe cookie shim
                     Toggle("Block Cross-Site Tracking", isOn: $browserManager.settingsManager.blockCrossSiteTracking)
                         .onChange(of: browserManager.settingsManager.blockCrossSiteTracking) { _, enabled in
-                            browserManager.trackingProtectionManager.setEnabled(enabled)
+                            browserManager.contentBlockingManager.setEnabled(enabled)
                         }
 
                     // Placeholders for future refinements
@@ -168,15 +168,15 @@ struct PrivacySettingsView: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle("Block Ads and Trackers", isOn: Binding(
-                        get: { browserManager.adBlockManager.isEnabled },
-                        set: { browserManager.adBlockManager.setEnabled($0) }
+                        get: { browserManager.contentBlockingManager.isEnabled },
+                        set: { browserManager.contentBlockingManager.setEnabled($0) }
                     ))
                     
                     Toggle("Aggressive Mode", isOn: Binding(
-                        get: { browserManager.adBlockManager.aggressiveMode },
-                        set: { browserManager.adBlockManager.setAggressiveMode($0) }
+                        get: { browserManager.contentBlockingManager.aggressiveMode },
+                        set: { browserManager.contentBlockingManager.setAggressiveMode($0) }
                     ))
-                    .disabled(!browserManager.adBlockManager.isEnabled)
+                    .disabled(!browserManager.contentBlockingManager.isEnabled)
                     
                     Text("Blocks ads, trackers, and malware using comprehensive filter lists. Aggressive mode includes additional tracking protection.")
                         .font(.caption)

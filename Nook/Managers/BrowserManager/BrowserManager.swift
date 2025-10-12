@@ -370,8 +370,8 @@ class BrowserManager: ObservableObject {
     var compositorManager: TabCompositorManager
     var splitManager: SplitViewManager
     var gradientColorManager: GradientColorManager
-    var trackingProtectionManager: TrackingProtectionManager
-    var adBlockManager: AdBlockManager
+    var contentBlockingManager: ContentBlockingManager
+    // Replaced by contentBlockingManager
     var findManager: FindManager
     var importManager: ImportManager
 
@@ -531,8 +531,7 @@ class BrowserManager: ObservableObject {
         self.compositorManager = TabCompositorManager()
         self.splitManager = SplitViewManager()
         self.gradientColorManager = GradientColorManager()
-        self.trackingProtectionManager = TrackingProtectionManager()
-        self.adBlockManager = AdBlockManager()
+        self.contentBlockingManager = ContentBlockingManager()
         self.findManager = FindManager()
         self.importManager = ImportManager()
 
@@ -555,12 +554,10 @@ class BrowserManager: ObservableObject {
         } else {
         self.gradientColorManager.setImmediate(.default)
         }
-        self.trackingProtectionManager.attach(browserManager: self)
-        self.adBlockManager.attach(browserManager: self)
+        self.contentBlockingManager.attach(browserManager: self)
         Task {
-            await self.adBlockManager.installRuleListIfNeeded()
+            await self.contentBlockingManager.installRuleListIfNeeded()
         }
-        self.trackingProtectionManager.setEnabled(self.settingsManager.blockCrossSiteTracking)
         self.externalMiniWindowManager.attach(browserManager: self)
         self.peekManager.attach(browserManager: self)
         bindPeekManagerUpdates()
@@ -582,7 +579,7 @@ class BrowserManager: ObservableObject {
         ) { [weak self] note in
             guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
             Task { @MainActor [weak self] in
-                self?.trackingProtectionManager.setEnabled(enabled)
+                self?.contentBlockingManager.setEnabled(enabled)
             }
         }
     }
@@ -606,12 +603,12 @@ class BrowserManager: ObservableObject {
     // MARK: - OAuth Assist Controls
     func maybeShowOAuthAssist(for url: URL, in tab: Tab) {
         // Only when protection is enabled and not already disabled for this tab
-        guard settingsManager.blockCrossSiteTracking, trackingProtectionManager.isEnabled else { return }
-        guard !trackingProtectionManager.isTemporarilyDisabled(tabId: tab.id) else { return }
+        guard settingsManager.blockCrossSiteTracking, contentBlockingManager.isEnabled else { return }
+        guard !contentBlockingManager.isTemporarilyDisabled(tabId: tab.id) else { return }
         let host = url.host?.lowercased() ?? ""
         guard !host.isEmpty else { return }
         // Respect per-domain allow list
-        guard !trackingProtectionManager.isDomainAllowed(host) else { return }
+        guard !contentBlockingManager.isDomainAllowed(host) else { return }
         // Simple heuristic for OAuth endpoints
         if isLikelyOAuthURL(url) {
             let now = Date()
@@ -631,13 +628,13 @@ class BrowserManager: ObservableObject {
     func oauthAssistAllowForThisTab(duration: TimeInterval = 15 * 60) {
         guard let assist = oauthAssist else { return }
         guard let tab = tabManager.allTabs().first(where: { $0.id == assist.tabId }) else { return }
-        trackingProtectionManager.disableTemporarily(for: tab, duration: duration)
+        contentBlockingManager.disableTemporarily(for: tab, duration: duration)
         hideOAuthAssist()
     }
 
     func oauthAssistAlwaysAllowDomain() {
         guard let assist = oauthAssist else { return }
-        trackingProtectionManager.allowDomain(assist.host, allowed: true)
+        contentBlockingManager.allowDomain(assist.host, allowed: true)
         hideOAuthAssist()
     }
 

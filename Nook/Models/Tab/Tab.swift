@@ -436,7 +436,7 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
 
         // Apply ad blocking to new webview
         if let webView = _webView {
-            browserManager?.adBlockManager.applyToWebView(webView, for: self)
+            browserManager?.contentBlockingManager.applyToWebView(webView)
         }
         print("Created WebView for tab: \(name)")
         // Inform extensions that this tab's view is now open/available BEFORE loading,
