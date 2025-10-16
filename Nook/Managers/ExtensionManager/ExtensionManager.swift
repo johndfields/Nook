@@ -3788,6 +3788,8 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         case "chromeCommands":
             handleCommandsScriptMessage(message)
         case "chromeAlarms":
+        case "chromeWebNavigation":
+            handleWebNavigationScriptMessage(message)
             handleAlarmsScriptMessage(message)
         case "chromeTabsResponse":
             // Handle tab message responses
@@ -5186,3 +5188,31 @@ extension ExtensionManager {
         }
     }
 }
+
+    // MARK: - WebNavigation Script Message Handler
+    func handleWebNavigationScriptMessage(_ message: WKScriptMessage) {
+        guard let messageBody = message.body as? [String: Any],
+              let api = messageBody["api"] as? String,
+              api == "webNavigation" else {
+            print("❌ [ExtensionManager] Invalid webNavigation message format")
+            return
+        }
+        
+        print("🧭 [ExtensionManager] Handling webNavigation script message")
+        
+        // Find the extension context for this message
+        guard let context = extensionContexts.values.first else {
+            print("❌ [ExtensionManager] No extension context found for webNavigation message")
+            return
+        }
+        
+        handleWebNavigationMessage(message: messageBody, from: context) { response in
+            // Send response back to the script
+            if let responseDict = response as? [String: Any],
+               let jsonData = try? JSONSerialization.data(withJSONObject: responseDict),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                let script = "window.postMessage({ type: 'webNavigationResponse', data: \(jsonString) }, '*');"
+                message.webView?.evaluateJavaScript(script, completionHandler: nil)
+            }
+        }
+    }

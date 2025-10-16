@@ -517,6 +517,11 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
             removeThemeColorObserver(from: webView)
             removeNavigationStateObservers(from: webView)
         }
+
+        // Clean up webNavigation data
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.cleanUpNavigationData(forTabId: self.id.uuidString)
+        }
         
         // 15. REMOVE FROM TAB MANAGER
         browserManager?.tabManager.removeTab(self.id)
@@ -1969,6 +1974,14 @@ extension Tab: WKNavigationDelegate {
                 self.url = newURL
             }
         }
+
+        // Fire webNavigation.onBeforeNavigate event
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.fireWebNavigationOnBeforeNavigate(
+                tabId: self.id.uuidString,
+                url: newURL.absoluteString
+            )
+        }
     }
 
     // MARK: - Content Committed
@@ -1982,6 +1995,14 @@ extension Tab: WKNavigationDelegate {
             ExtensionManager.shared.notifyTabPropertiesChanged(self, properties: [.loading])
         }
 
+
+        // Fire webNavigation.onCommitted event
+        if #available(macOS 15.4, *) {
+            ExtensionManager.shared.fireWebNavigationOnCommitted(
+                tabId: self.id.uuidString,
+                url: newURL.absoluteString
+            )
+        }
         if let newURL = webView.url {
             self.url = newURL
             browserManager?.syncTabAcrossWindows(self.id)
@@ -1993,6 +2014,14 @@ extension Tab: WKNavigationDelegate {
     }
 
     // MARK: - Loading Success
+
+            // Fire webNavigation.onCompleted event
+            if #available(macOS 15.4, *) {
+                ExtensionManager.shared.fireWebNavigationOnCompleted(
+                    tabId: self.id.uuidString,
+                    url: newURL.absoluteString
+                )
+            }
     public func webView(
         _ webView: WKWebView,
         didFinish navigation: WKNavigation!
@@ -2062,6 +2091,15 @@ extension Tab: WKNavigationDelegate {
         updateNavigationStateEnhanced(source: "didCommit")
 
         // Trigger background color extraction
+
+        // Fire webNavigation.onErrorOccurred event
+        if let currentURL = webView.url, #available(macOS 15.4, *) {
+            ExtensionManager.shared.fireWebNavigationOnErrorOccurred(
+                tabId: self.id.uuidString,
+                url: currentURL.absoluteString,
+                error: error.localizedDescription
+            )
+        }
         updateBackgroundColor(from: webView)
         
         // Apply mute state using MuteableWKWebView if the tab was previously muted
@@ -2091,6 +2129,15 @@ extension Tab: WKNavigationDelegate {
     // MARK: - Loading Failed (before content started loading)
     public func webView(
         _ webView: WKWebView,
+
+        // Fire webNavigation.onErrorOccurred event
+        if let currentURL = webView.url, #available(macOS 15.4, *) {
+            ExtensionManager.shared.fireWebNavigationOnErrorOccurred(
+                tabId: self.id.uuidString,
+                url: currentURL.absoluteString,
+                error: error.localizedDescription
+            )
+        }
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
@@ -2337,10 +2384,28 @@ extension Tab: WKScriptMessageHandler {
         
         case "historyStateDidChange":
             if let href = message.body as? String, let url = URL(string: href) {
+                let oldURL = self.url
                 DispatchQueue.main.async {
                     if self.url.absoluteString != url.absoluteString {
                         self.url = url
                         self.browserManager?.syncTabAcrossWindows(self.id)
+                        
+                        // Fire webNavigation events based on what changed
+                        if #available(macOS 15.4, *) {
+                            // Check if it's a hash change (reference fragment update)
+                            if oldURL.path == url.path && oldURL.query == url.query && oldURL.fragment != url.fragment {
+                                ExtensionManager.shared.fireWebNavigationOnReferenceFragmentUpdated(
+                                    tabId: self.id.uuidString,
+                                    url: url.absoluteString
+                                )
+                            } else {
+                                // It's a history.pushState or history.replaceState
+                                ExtensionManager.shared.fireWebNavigationOnHistoryStateUpdated(
+                                    tabId: self.id.uuidString,
+                                    url: url.absoluteString
+                                )
+                            }
+                        }
                     }
                 }
             }
