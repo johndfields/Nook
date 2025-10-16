@@ -1921,6 +1921,32 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     
     // MARK: - WKWebExtensionControllerDelegate
     
+    /// Get the actual popup path from the extension's manifest
+    /// This supports both MV2 (browser_action) and MV3 (action) manifest formats
+    private func getPopupPath(for extensionContext: WKWebExtensionContext) -> String? {
+        guard let manifest = extensionContext.manifest else { return nil }
+        
+        // MV3: Check action.default_popup
+        if let action = manifest["action"] as? [String: Any],
+           let popup = action["default_popup"] as? String {
+            return popup
+        }
+        
+        // MV2: Check browser_action.default_popup
+        if let browserAction = manifest["browser_action"] as? [String: Any],
+           let popup = browserAction["default_popup"] as? String {
+            return popup
+        }
+        
+        // MV2: Check page_action.default_popup (less common)
+        if let pageAction = manifest["page_action"] as? [String: Any],
+           let popup = pageAction["default_popup"] as? String {
+            return popup
+        }
+        
+        return nil
+    }
+    
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         // Present the extension's action popover with enhanced Action API support
 
@@ -2035,17 +2061,22 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("      Popup uses correct data store: \(dataStoreMatches)")
 
             if !dataStoreMatches {
-                print("   ❌ CRITICAL: Popup data store mismatch - this causes network failures!")
-                print("   ❌ This explains 'to extension base network error' messages")
-
-                // Since websiteDataStore is read-only after creation, we need to document this limitation
-                print("   🔧 [ExtensionManager] NOTE: websiteDataStore cannot be changed after WebView creation")
-                print("   🔧 [ExtensionManager] The fix must happen at WebView creation time")
+                print("   ⚠️ WARNING: Popup data store mismatch detected")
+                print("   ⚠️ This may cause network failures and resource loading issues")
+                print("   📝 NOTE: websiteDataStore is read-only after WebView creation")
+                print("   📝 Solution: WKWebExtension should use extensionContext.webViewConfiguration")
+                print("   📝 Workaround: Extensions may still work if webExtensionController is correct")
+            } else {
+                print("   ✅ Popup data store matches expected configuration")
             }
 
-            // CRITICAL: Test webkit-extension:// URL resolution in popup context
+            // IMPROVED: Test webkit-extension:// URL resolution using actual popup path from manifest
             print("   🔧 [ExtensionManager] Testing popup webkit-extension:// URL resolution...")
-            let testPopupURL = "webkit-extension://\(extensionContext.uniqueIdentifier)/popup/index.html"
+            
+            // Get the actual popup path from the manifest
+            let actualPopupPath = getPopupPath(for: extensionContext) ?? "popup.html"
+            let testPopupURL = "webkit-extension://\(extensionContext.uniqueIdentifier)/\(actualPopupPath)"
+            print("   🔧 [ExtensionManager] Actual popup path from manifest: \(actualPopupPath)")
             print("   🔧 [ExtensionManager] Test popup URL: \(testPopupURL)")
 
             // Check if popup can resolve extension URLs
@@ -2352,178 +2383,56 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     console.log('✅ [State Migration Fix] Migration timeout breaker installed');
                     """
 
-                    // Add a comprehensive script to fix extension resource loading
+                    // IMPROVED: Targeted popup resource loading fixes without hardcoded paths
                     let resourceFixScript = """
                     (function(){
-                        console.log('🔧 [Popup Resource Fix] Initializing extension resource loading fixes');
-                        console.log('🔍 [Popup Resource Test] URL:', window.location.href);
-                        console.log('🔍 [Popup Resource Test] Extension ID:', chrome.runtime.id || browser.runtime.id);
+                        console.log('🔧 [Popup Resource Fix] Initializing improved extension resource loading fixes');
+                        console.log('🔍 [Popup Info] URL:', window.location.href);
+                        console.log('🔍 [Popup Info] Extension ID:', chrome.runtime?.id || browser.runtime?.id || 'unknown');
 
-                        // CRITICAL FIX: Implement robust resource loading with fallbacks
-                        const testResources = [
-                            'popup.js',
-                            'popup/index.js',
-                            'popup/popup.js',
-                            'content/popup.js',
-                            'index.js',
-                            'popup.html'
-                        ];
-
-                        let successCount = 0;
-                        let testCount = 0;
-                        let failedResources = [];
-
-                        // Enhanced fetch with timeout and retry logic
-                        function fetchResourceWithFallback(resourceUrl, resourceName, retryCount = 0) {
-                            const maxRetries = 2;
-                            const timeout = 5000; // 5 second timeout
-
-                            return Promise.race([
-                                fetch(resourceUrl, {
-                                    method: 'GET',
-                                    headers: {
-                                        'Cache-Control': 'no-cache',
-                                        'Pragma': 'no-cache'
-                                    }
-                                }),
-                                new Promise((_, reject) =>
-                                    setTimeout(() => reject(new Error('Timeout')), timeout)
-                                )
-                            ])
-                            .then(response => {
-                                if (response.ok) {
-                                    console.log('✅ [Popup Resource Test] Successfully loaded:', resourceName);
-                                    successCount++;
-                                    return response.text();
-                                } else {
-                                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                                }
-                            })
-                            .catch(err => {
-                                console.error('❌ [Popup Resource Test] Fetch error for', resourceName, ':', err.message);
-                                failedResources.push(resourceName);
-
-                                // Retry logic for network errors
-                                if (retryCount < maxRetries && (err.message.includes('Failed to fetch') || err.message.includes('Timeout'))) {
-                                    console.log(`🔄 [Popup Resource Test] Retrying ${resourceName} (attempt ${retryCount + 1}/${maxRetries})`);
-                                    return new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-                                        .then(() => fetchResourceWithFallback(resourceUrl, resourceName, retryCount + 1));
-                                }
-
-                                // If it's the popup.html file, try to reload the page
-                                if (resourceName === 'popup.html' && retryCount === 0) {
-                                    console.log('🔄 [Popup Resource Test] Attempting to reload popup due to missing popup.html');
-                                    setTimeout(() => {
-                                        window.location.reload();
-                                    }, 1000);
-                                }
-
-                                throw err;
-                            });
+                        // Check if Chrome/Browser APIs are available
+                        if (typeof chrome === 'undefined' || !chrome.runtime) {
+                            console.error('❌ [Popup Resource Fix] Chrome APIs not available');
+                            return;
                         }
 
-                        // Test all resources with enhanced error handling
-                        testResources.forEach(resource => {
-                            const resourceUrl = (chrome.runtime || browser.runtime).getURL(resource);
-                            console.log('🔍 [Popup Resource Test] Testing resource:', resourceUrl);
-                            testCount++;
+                        console.log('✅ [Popup Resource Fix] Chrome APIs available');
+                        console.log('   Extension base URL:', chrome.runtime.getURL('/'));
 
-                            fetchResourceWithFallback(resourceUrl, resource)
-                                .catch(() => {
-                                    // Resource failed, but continue testing others
+                        // Monitor network errors for debugging
+                        window.addEventListener('error', function(event) {
+                            if (event.message && event.message.includes('network')) {
+                                console.error('🌐 [Network Error] Network error detected:', {
+                                    message: event.message,
+                                    filename: event.filename,
+                                    lineno: event.lineno
                                 });
-                        });
-
-                        // Final status report
-                        setTimeout(() => {
-                            console.log('📊 [Popup Resource Test] Final Report:');
-                            console.log('   - Success:', successCount + '/' + testCount);
-                            console.log('   - Failed resources:', failedResources);
-
-                            if (successCount === 0) {
-                                console.warn('⚠️ [Popup Resource Test] ALL RESOURCES FAILED - This indicates a serious extension serving issue');
-
-                                // Try to diagnose the problem
-                                console.log('🔍 [Popup Resource Test] Diagnosing extension serving...');
-
-                                // Check if we can access basic extension APIs
-                                if (typeof chrome !== 'undefined' && chrome.runtime) {
-                                    console.log('✅ [Popup Resource Test] Chrome APIs available');
-                                    console.log('   Extension ID:', chrome.runtime.id);
-
-                                    // Test if the extension URL scheme works
-                                    const testUrl = chrome.runtime.getURL('/');
-                                    console.log('   Extension base URL:', testUrl);
-
-                                    // Try a simple XHR to test connectivity
-                                    try {
-                                        const xhr = new XMLHttpRequest();
-                                        xhr.open('GET', testUrl, true);
-                                        xhr.onload = function() {
-                                            if (xhr.status === 200) {
-                                                console.log('✅ [Popup Resource Test] XHR to extension base successful');
-                                            } else {
-                                                console.log('❌ [Popup Resource Test] XHR to extension base failed:', xhr.status);
-                                            }
-                                        };
-                                        xhr.onerror = function() {
-                                            console.error('❌ [Popup Resource Test] XHR to extension base network error');
-                                        };
-                                        xhr.send();
-                                    } catch (xhrError) {
-                                        console.error('❌ [Popup Resource Test] XHR creation failed:', xhrError);
-                                    }
-                                } else {
-                                    console.error('❌ [Popup Resource Test] Chrome APIs not available');
-                                }
-                            } else {
-                                console.log('✅ [Popup Resource Test] Some resources loaded successfully - extension serving is working');
                             }
-                        }, 8000); // Wait 8 seconds for all tests to complete
+                        }, true);
 
-                        // Test external API access
-                        console.log('🌐 [Popup API Test] Testing external API access...');
-                        fetch('https://api.sprig.com/sdk/1/visitors/test/events', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ test: true })
-                        })
-                        .then(response => {
-                            console.log('✅ [Popup API Test] External API response:', response.status);
-                        })
-                        .catch(err => {
-                            console.error('❌ [Popup API Test] External API error:', err);
-                        });
-
-                        // CRITICAL FIX: WebAssembly MIME type workaround
-                        console.log('🔧 [WebAssembly MIME Fix] Applying WebAssembly MIME type workaround...');
-
-                        // Override WebAssembly.instantiateStreaming to handle MIME type issues
+                        // CRITICAL FIX: WebAssembly MIME type workaround for extensions that use WASM
                         if (typeof WebAssembly !== 'undefined' && WebAssembly.instantiateStreaming) {
+                            console.log('🔧 [WebAssembly MIME Fix] Applying WebAssembly MIME type workaround...');
+                            
                             const originalInstantiateStreaming = WebAssembly.instantiateStreaming;
 
                             WebAssembly.instantiateStreaming = function(responseSource, importObject) {
-                                console.log('🔧 [WebAssembly MIME Fix] Intercepted instantiateStreaming call');
-
                                 return Promise.resolve(responseSource)
                                     .then(source => {
-                                        // If source is a Response object, check its MIME type
                                         if (source instanceof Response) {
                                             const contentType = source.headers.get('Content-Type');
-                                            console.log('🔧 [WebAssembly MIME Fix] Response Content-Type:', contentType);
-
-                                            // If MIME type is incorrect or missing, fix it
+                                            
+                                            // Fix incorrect MIME type
                                             if (!contentType || !contentType.includes('application/wasm')) {
-                                                console.warn('⚠️ [WebAssembly MIME Fix] Incorrect MIME type detected, applying workaround');
-
-                                                // Create a new Response with the correct MIME type
+                                                console.warn('⚠️ [WebAssembly MIME Fix] Incorrect MIME type, applying workaround');
+                                                
                                                 return source.arrayBuffer().then(buffer => {
                                                     return new Response(buffer, {
                                                         status: source.status,
                                                         statusText: source.statusText,
                                                         headers: {
-                                                            'Content-Type': 'application/wasm',
-                                                            'Content-Length': buffer.byteLength.toString()
+                                                            ...Object.fromEntries(source.headers.entries()),
+                                                            'Content-Type': 'application/wasm'
                                                         }
                                                     });
                                                 });
@@ -2531,76 +2440,50 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                         }
                                         return source;
                                     })
-                                    .then(fixedSource => {
-                                        // Call the original function with the fixed source
-                                        return originalInstantiateStreaming.call(this, fixedSource, importObject);
-                                    })
-                                    .catch(error => {
-                                        console.error('❌ [WebAssembly MIME Fix] instantiateStreaming failed:', error);
-                                        console.log('🔄 [WebAssembly MIME Fix] Falling back to instantiate + compile');
-
-                                        // Fallback: fetch as arrayBuffer and use instantiate
-                                        if (responseSource instanceof Response) {
-                                            return responseSource.arrayBuffer()
-                                                .then(buffer => WebAssembly.compile(buffer))
-                                                .then(module => WebAssembly.instantiate(module, importObject));
-                                        }
-
-                                        throw error;
+                                    .then(source => originalInstantiateStreaming.call(this, source, importObject))
+                                    .catch(err => {
+                                        console.error('❌ [WebAssembly MIME Fix] Error:', err);
+                                        throw err;
                                     });
                             };
 
-                            console.log('✅ [WebAssembly MIME Fix] WebAssembly.instantiateStreaming workaround installed');
-                        } else {
-                            console.log('ℹ️ [WebAssembly MIME Fix] WebAssembly.instantiateStreaming not available');
+                            console.log('✅ [WebAssembly MIME Fix] Workaround applied');
                         }
 
-                        // Also add a fetch interceptor for .wasm files to fix MIME types
+                        // Fetch interceptor for .wasm files
                         const originalFetch = window.fetch;
                         window.fetch = function(input, init) {
                             const url = typeof input === 'string' ? input : input.url;
 
                             // Intercept .wasm file requests
                             if (url && url.endsWith('.wasm')) {
-                                console.log('🔧 [WebAssembly MIME Fix] Intercepting .wasm fetch request:', url);
-
                                 return originalFetch.call(this, input, init)
                                     .then(response => {
                                         const contentType = response.headers.get('Content-Type');
 
                                         // Fix MIME type if needed
                                         if (!contentType || !contentType.includes('application/wasm')) {
-                                            console.warn('⚠️ [WebAssembly MIME Fix] Fixing WASM MIME type from:', contentType);
-
                                             return response.arrayBuffer().then(buffer => {
                                                 return new Response(buffer, {
                                                     status: response.status,
                                                     statusText: response.statusText,
                                                     headers: {
-                                                        'Content-Type': 'application/wasm',
-                                                        'Content-Length': buffer.byteLength.toString(),
-                                                        // Copy other important headers
-                                                        'Cache-Control': response.headers.get('Cache-Control') || 'public, max-age=3600',
-                                                        'ETag': response.headers.get('ETag') || '',
-                                                        'Last-Modified': response.headers.get('Last-Modified') || ''
+                                                        ...Object.fromEntries(response.headers.entries()),
+                                                        'Content-Type': 'application/wasm'
                                                     }
                                                 });
                                             });
                                         }
-
                                         return response;
                                     });
                             }
 
-                            // For non-wasm requests, use original fetch
-                            return originalFetch.apply(this, arguments);
+                            return originalFetch.call(this, input, init);
                         };
 
-                        console.log('✅ [WebAssembly MIME Fix] WebAssembly MIME type workarounds installed successfully');
-
+                        console.log('✅ [Popup Resource Fix] Initialization complete');
                     })();
                     """
-
                     // Inject both scripts at different times for debugging
                     let simpleTestUserScript = WKUserScript(source: simpleTestScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
                     let resourceFixUserScript = WKUserScript(source: resourceFixScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
