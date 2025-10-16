@@ -153,8 +153,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Store controller reference first
         self.extensionController = controller
 
-        // CRITICAL FIX: Register all existing tabs IMMEDIATELY after controller creation
-        // This prevents "Tab not found" errors when extensions try to communicate
         print("🔧 [ExtensionManager] Performing immediate tab registration after controller creation...")
         registerAllExistingTabs()
         
@@ -272,12 +270,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         
         extensionController = controller
 
-        // CRITICAL FIX: Register all existing tabs IMMEDIATELY after controller setup
-        // This prevents "Tab not found" errors when extensions try to communicate
         print("🔧 [ExtensionManager] Performing immediate tab registration after controller setup...")
         registerAllExistingTabs()
 
-        // CRITICAL FIX: Ensure cross-context tab sharing
         // This makes all tabs visible to all loaded extensions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.registerAllTabsAcrossAllContexts()
@@ -399,7 +394,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("✅ [ExtensionManager] Tab registration complete")
     }
 
-    /// CRITICAL FIX: Register all existing tabs with a SPECIFIC extension context
     /// This ensures newly loaded extensions know about all existing tabs
     private func registerAllExistingTabsForContext(_ extensionContext: WKWebExtensionContext) {
         guard let bm = browserManagerRef, let controller = extensionController else {
@@ -417,7 +411,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         print("📊 [ExtensionManager] Found \(allTabs.count) total tabs to register")
 
-        // CRITICAL FIX: Register each tab with enhanced debugging
         for (index, tab) in allTabs.enumerated() {
             let adapter = self.adapter(for: tab, browserManager: bm)
 
@@ -426,13 +419,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("      - WebView available: \(tab.webView != nil)")
             print("      - Extension ID: \(extensionId)")
 
-            // CRITICAL FIX: Ensure the adapter has proper extension context association
-            // This is the key to fixing "Tab not found" errors
-
             // Force the adapter to be registered with the controller immediately
             controller.didOpenTab(adapter)
 
-            // CRITICAL FIX: Also set active tab if this is the active one
             if let activeTab = bm.currentTabForActiveWindow(), activeTab.id == tab.id {
                 controller.didActivateTab(adapter, previousActiveTab: nil)
                 controller.didSelectTabs([adapter])
@@ -443,7 +432,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             registeredCount += 1
         }
 
-        // CRITICAL FIX: Ensure at least one tab is set as active if none were automatically detected
         if !activeTabRegistered && !allTabs.isEmpty {
             let firstTab = allTabs.first!
             let firstAdapter = self.adapter(for: firstTab, browserManager: bm)
@@ -456,7 +444,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         print("✅ [ExtensionManager] Registered \(registeredCount) existing tabs with extension: \(extensionId)")
         print("🔍 [ExtensionManager] Extension should now be able to communicate with all existing tabs")
 
-        // CRITICAL FIX: Add debugging to verify tab registration worked
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in
             print("🔍 [ExtensionManager] Verifying tab registration after delay...")
             self.verifyTabRegistration(extensionContext: extensionContext, expectedCount: registeredCount)
@@ -523,7 +510,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
     }
 
-    /// CRITICAL FIX: Register all existing tabs with ALL loaded extension contexts
     /// This ensures cross-context tab sharing and prevents "Tab not found" errors
     private func registerAllTabsAcrossAllContexts() {
         guard extensionController != nil else {
@@ -572,7 +558,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         for tab in allTabs {
             guard let webView = tab.webView else { continue }
 
-            // CRITICAL FIX: Ensure WebView has extension controller assigned
             if webView.configuration.webExtensionController !== controller {
                 print("  📝 Updating WebView for tab: \(tab.name)")
                 webView.configuration.webExtensionController = controller
@@ -933,7 +918,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("   Directory permissions: \(String(permissions ?? 0, radix: 8))")
         }
 
-        // CRITICAL FIX: Ensure the destinationDir URL is in the correct format for WebKit
         // WebKit expects file:// URLs for resource base URLs
         var correctedBaseURL = destinationDir
         if correctedBaseURL.scheme == nil {
@@ -984,7 +968,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("⚠️ [ExtensionManager] Extension context webViewConfiguration is nil, setting up...")
             print("   🔧 [ExtensionManager] Using pre-configured sharedWebConfig for proper resource loading")
 
-            // CRITICAL FIX: Use the sharedWebConfig instead of creating a new one
             // The sharedWebConfig has the correct webExtensionController set for webkit-extension:// URL resolution
             guard let config = self.sharedWebConfig else {
                 print("❌ [ExtensionManager] sharedWebConfig is nil, cannot configure extension context")
@@ -1107,13 +1090,11 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Load with native controller
         try extensionController?.load(extensionContext)
 
-        // CRITICAL FIX: Wait for extension to be fully loaded before loading background content
         // WebKit needs time to properly initialize the extension context
         Task { @MainActor in
             // Wait a brief moment for the extension context to fully initialize
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
-            // CRITICAL FIX: Register all existing tabs with THIS SPECIFIC extension context
             // This ensures the newly loaded extension knows about all existing tabs
             self.registerAllExistingTabsForContext(extensionContext)
 
@@ -1531,7 +1512,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                     print("⚠️ [ExtensionManager] Extension context webViewConfiguration is nil (reload), setting up...")
                                     print("   🔧 [ExtensionManager] Using pre-configured sharedWebConfig for proper resource loading")
 
-                                    // CRITICAL FIX: Use the sharedWebConfig instead of creating a new one
                                     // The sharedWebConfig has the correct webExtensionController set for webkit-extension:// URL resolution
                                     guard let config = self.sharedWebConfig else {
                                         print("❌ [ExtensionManager] sharedWebConfig is nil, cannot configure extension context (reload)")
@@ -1603,11 +1583,9 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                                 // PROACTIVE CORS: Grant common API permissions to prevent repeated CORS failures
                                 grantCommonAPIPermissions(to: extensionContext)
 
-                                // CRITICAL: Load background content if the extension has a background script
                                 // This is essential for service workers and background extensions
                                 print("🔧 [ExtensionManager] Loading background content for extension...")
 
-                                // CRITICAL FIX: Wait for extension to be fully loaded before loading background content
                                 Task { @MainActor in
                                     // Wait a brief moment for the extension context to fully initialize
                                     try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -1694,7 +1672,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     func getExtensionContext(for extensionId: String) -> WKWebExtensionContext? {
         let context = extensionContexts[extensionId]
 
-        // CRITICAL FIX: Add debugging for extension context lookup failures
         if context == nil {
             print("🔍 [ExtensionManager] Extension context not found for: \(extensionId)")
             print("   Available extension contexts: \(extensionContexts.keys)")
@@ -1789,7 +1766,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
     private func configureWebViewForExtensionSupport(_ webView: WKWebView, controller: WKWebExtensionController) {
         let webViewId = ObjectIdentifier(webView)
 
-        // CRITICAL FIX: Check if this WebView has already been configured
         if configuredWebViews.contains(webViewId) {
             print("  ℹ️ [ExtensionManager] WebView already configured, skipping duplicate setup")
             return
@@ -1811,7 +1787,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             print("  ✅ [ExtensionManager] Added message handler: \(handlerName)")
         }
 
-        // CRITICAL FIX: Inject clipboard API polyfill into regular browser tabs
         // This enables content scripts to use navigator.clipboard API
         injectClipboardAPI(into: contentController)
         print("  ✅ [ExtensionManager] Clipboard API polyfill injected for content scripts")
@@ -1845,7 +1820,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let a = adapter(for: tab, browserManager: bm)
         print("🔔 [ExtensionManager] Notifying controller of tab opened: \(tab.name)")
 
-        // CRITICAL FIX: Ensure the tab's WebView has the extension controller set
         // This fixes "Tab not found" errors when content scripts try to communicate
         if let webView = tab.webView {
             if webView.configuration.webExtensionController !== controller {
@@ -1856,7 +1830,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = true
             }
 
-            // CRITICAL FIX: Always ensure user content controller is properly configured
             print("  🔧 [ExtensionManager] Configuring script message handlers for: \(tab.name)")
             configureWebViewForExtensionSupport(webView, controller: controller)
         }
@@ -1864,7 +1837,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         // Register the tab with all extension contexts
         controller.didOpenTab(a)
 
-        // CRITICAL FIX: After registration, verify the tab is accessible to extensions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.verifyTabAccessibility(tab: tab, controller: controller)
         }
@@ -2093,7 +2065,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 }
             }
 
-            // CRITICAL FIX: Ensure popup WebView inherits all critical settings from extension's configuration
             // This is essential for proper webkit-extension:// URL resolution and resource loading
             if let extensionConfig = expectedConfig {
                 print("   🔧 [ExtensionManager] Applying extension configuration to popup WebView:")
@@ -2113,7 +2084,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
             // CRITICAL NETWORK FIX: Ensure popup WebView uses the same data store as the browser for network connectivity
             if webView.configuration.websiteDataStore !== controller.configuration.defaultWebsiteDataStore {
-                print("   🔧 [ExtensionManager] CRITICAL FIX: Popup WebView data store differs - this causes network errors!")
                 print("      [ExtensionManager] Popup data store: \(webView.configuration.websiteDataStore)")
                 print("      [ExtensionManager] Browser data store: \(controller.configuration.defaultWebsiteDataStore)")
 
@@ -2202,7 +2172,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 print("   ✅ [ExtensionManager] Popup WebView uses correct data store - network connectivity should work")
             }
 
-            // CRITICAL FIX: The popup needs to use the extension's own configuration for proper resource loading
             // The webkit-extension:// URLs need the webExtensionController to be set correctly
             print("   🔧 [ExtensionManager] Popup configuration check:")
             print("      [ExtensionManager] webExtensionController: \(webView.configuration.webExtensionController != nil ? "✅" : "❌")")
@@ -2212,7 +2181,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
             if let url = webView.url, url.scheme?.lowercased() == "webkit-extension" {
                 print("   🎯 [ExtensionManager] Popup loading webkit-extension:// URL - ensuring proper resource access")
 
-                // CRITICAL FIX: Add comprehensive error handling for WKWebExtensionErrorDomain Code=2
                 let errorHandlerScript = """
                 // WKWebExtensionErrorDomain Code=2 Error Handler
                 window.addEventListener('error', function(event) {
@@ -2265,7 +2233,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     print("   ✅ [ExtensionManager] Added WKWebExtensionErrorDomain error handler")
                 }
 
-                // CRITICAL FIX: Inject Chrome APIs early for popup Angular bootstrap
                 // This ensures chrome.* APIs are available
                 let hasChromeAPIInjection = existingScripts.contains { $0.source.contains("CHROME API INJECTION") }
                 if !hasChromeAPIInjection {
@@ -2293,7 +2260,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     console.log('🚀 [Simple Test] Browser APIs:', typeof browser !== 'undefined' ? 'browser available' : 'browser not available');
                     console.log('🚀 [Simple Test] Runtime ID:', (chrome.runtime || browser.runtime).id);
 
-                    // CRITICAL FIX: Prevent infinite state migration timeout loops
                     console.log('🔧 [State Migration Fix] Installing state migration timeout breaker...');
 
                     // Track migration attempts to detect infinite loops
@@ -2410,7 +2376,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                             }
                         }, true);
 
-                        // CRITICAL FIX: WebAssembly MIME type workaround for extensions that use WASM
                         if (typeof WebAssembly !== 'undefined' && WebAssembly.instantiateStreaming) {
                             console.log('🔧 [WebAssembly MIME Fix] Applying WebAssembly MIME type workaround...');
                             
@@ -3907,7 +3872,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         return windowAdapter != nil ? [windowAdapter!] : []
     }
 
-    // CRITICAL FIX: Handle extension content script communication
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, sendMessageToContentScript message: [String : Any]?, toTabWithID tabID: String, in extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any?, Error>) -> Void) {
         print("📨 [ExtensionManager] sendMessageToContentScript called for tabID: \(tabID)")
@@ -3932,7 +3896,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
 
         // Ensure the tab's WebView has the extension controller
         if webView.configuration.webExtensionController !== controller {
-            print("  🔧 [ExtensionManager] CRITICAL FIX: Adding missing extension controller for message handling")
             webView.configuration.webExtensionController = controller
         }
 
@@ -3975,7 +3938,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         }
     }
 
-    // CRITICAL FIX: Handle extension port connections for runtime.connect()
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, openPortToExtensionContext extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<Any, Error>) -> Void) {
         print("🔌 [ExtensionManager] openPortToExtensionContext called")
@@ -3989,7 +3951,6 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         completionHandler(.success(portInfo))
     }
 
-    // CRITICAL FIX: Handle tab requests for extension contexts
     @available(macOS 15.4, *)
     func webExtensionController(_ controller: WKWebExtensionController, tabWithID tabID: String, in extensionContext: WKWebExtensionContext, completionHandler: @escaping (Result<(any WKWebExtensionTab)?, Error>) -> Void) {
         print("🔍 [ExtensionManager] tabWithID called for tabID: \(tabID)")

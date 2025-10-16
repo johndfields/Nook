@@ -83,7 +83,6 @@ extension ExtensionManager {
             // Broadcast to all extension contexts (including background scripts)
             broadcastMessageToAllContexts(runtimeMessage, from: extensionId)
 
-            // CRITICAL FIX: Provide timeout for broadcasts that don't get responses
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
                 if let callback = self.pendingRuntimeMessageRepliesAccess[messageId] {
                     print("[ExtensionManager+Runtime] Timeout for message \(messageId) - providing default response")
@@ -118,10 +117,6 @@ extension ExtensionManager {
 
     private func deliverMessageToContext(_ message: [String: Any], to context: WKWebExtensionContext) {
         print("[ExtensionManager+Runtime] Delivering message to extension context: \(context.uniqueIdentifier)")
-
-        // CRITICAL FIX: Simplified message delivery using WebKit's built-in system
-        // The delegate method we added (webExtensionController:sendMessage:...) will be called by WebKit
-        // We don't need to manually call delegate methods - WebKit handles the routing
 
         // Check if we have a pending reply handler for this message
         if let messageId = message["id"] as? String,
@@ -985,7 +980,6 @@ extension ExtensionManager {
 
         print("[ExtensionManager+Runtime] Received script message: \(messageBody.keys)")
 
-        // CRITICAL FIX: Ensure we have extension context
         guard let extensionContext = extensionContextsAccess.values.first else {
             print("[ExtensionManager+Runtime] No extension context available for runtime message")
             return
@@ -997,7 +991,6 @@ extension ExtensionManager {
 
             print("[ExtensionManager+Runtime] Sending response: \(response ?? NSNull())")
 
-            // CRITICAL FIX: Send response back to the same webView that sent the message
             let responseScript: String
             if let responseJSON = try? JSONSerialization.data(withJSONObject: response ?? NSNull()),
                let responseString = String(data: responseJSON, encoding: .utf8) {
@@ -1055,8 +1048,6 @@ extension ExtensionManager {
             print("❌ [ExtensionManager] Extension context loading FAILED for \(extensionId): \(error.localizedDescription)")
             print("❌ [ExtensionManager] webkit-extension:// URLs will NOT work without proper loading")
 
-            // CRITICAL FIX: Even on load error, try to provide basic functionality
-            // But first, attempt to diagnose the failure
             diagnoseExtensionLoadingFailure(extensionId: extensionId, error: error, context: webExtensionContext)
             return
         }
@@ -1183,7 +1174,6 @@ extension ExtensionManager {
             let isActive = extensionContext.webExtensionController != nil
             print("📊 [ExtensionManager] Extension context active: \(isActive)")
 
-            // CRITICAL FIX: Check for WebAssembly MIME type issues
             self.checkWebAssemblyMIMETypes(packagePath: packagePath)
         }
     }
