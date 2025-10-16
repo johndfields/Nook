@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "WebNavigation API Test Suite",
+  "version": "1.0.0",
+  "description": "Comprehensive test suite for chrome.webNavigation API in Nook",
+  "permissions": [
+    "webNavigation",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WebNavigation Test Suite"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
+

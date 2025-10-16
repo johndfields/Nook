@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNavigation Test Suite</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      width: 600px;
+      min-height: 400px;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #f1f3f5;
+      color: #495057;
+    }
+
+    .btn-danger {
+      background: #ff6b6b;
+      color: white;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .results-section {
+      margin-top: 20px;
+    }
+
+    .section-header {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .results-container {
+      max-height: 400px;
+      overflow-y: auto;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .event-item {
+      background: white;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      border-left: 4px solid #667eea;
+      transition: all 0.2s;
+    }
+
+    .event-item:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transform: translateX(4px);
+    }
+
+    .event-item.error {
+      border-left-color: #ff6b6b;
+    }
+
+    .event-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .event-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .event-time {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .event-details {
+      font-size: 12px;
+      color: #666;
+      font-family: 'Monaco', 'Courier New', monospace;
+      background: #f1f3f5;
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-success {
+      background: #51cf66;
+    }
+
+    .status-error {
+      background: #ff6b6b;
+    }
+
+    .status-pending {
+      background: #ffd43b;
+    }
+
+    .test-instructions {
+      background: #e7f5ff;
+      border: 1px solid #339af0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #1864ab;
+    }
+
+    .test-instructions strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .test-instructions ol {
+      margin-left: 20px;
+    }
+
+    .test-instructions li {
+      margin-bottom: 4px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f3f5;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #adb5bd;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #868e96;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-success {
+      background: #d3f9d8;
+      color: #2b8a3e;
+    }
+
+    .badge-error {
+      background: #ffe3e3;
+      color: #c92a2a;
+    }
+
+    .badge-info {
+      background: #d0ebff;
+      color: #1864ab;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      <span>🧪</span>
+      <span>WebNavigation Test Suite</span>
+    </h1>
+    <div class="subtitle">Comprehensive testing for chrome.webNavigation API</div>
+
+    <div class="test-instructions">
+      <strong>📋 How to run tests:</strong>
+      <ol>
+        <li>Click "Run All Tests" button below</li>
+        <li>Navigate to any website in the current tab</li>
+        <li>Try hash changes (click anchors with #)</li>
+        <li>Test history API (single-page apps)</li>
+        <li>Watch events appear in real-time!</li>
+      </ol>
+    </div>
+
+    <div class="controls">
+      <button class="btn-primary" id="runTestsBtn">
+        <span>▶️</span>
+        <span>Run All Tests</span>
+      </button>
+      <button class="btn-secondary" id="refreshBtn">
+        <span>🔄</span>
+        <span>Refresh</span>
+      </button>
+      <button class="btn-danger" id="clearBtn">
+        <span>🗑️</span>
+        <span>Clear</span>
+      </button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="eventCount">0</div>
+        <div class="stat-label">Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="frameCount">0</div>
+        <div class="stat-label">Frames</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="errorCount">0</div>
+        <div class="stat-label">Errors</div>
+      </div>
+    </div>
+
+    <div class="results-section">
+      <div class="section-header">
+        <span>📊</span>
+        <span>Event Log</span>
+        <span class="badge badge-info" id="statusBadge">Idle</span>
+      </div>
+      <div class="results-container" id="resultsContainer">
+        <div class="empty-state">
+          <div class="empty-state-icon">🎯</div>
+          <div>Click "Run All Tests" to start monitoring navigation events</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+
