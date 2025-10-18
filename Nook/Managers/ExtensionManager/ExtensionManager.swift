@@ -2259,7 +2259,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                 }
 
                 // This ensures chrome.* APIs are available
-                let hasChromeAPIInjection = existingScripts.contains { $0.source.contains("CHROME API INJECTION") }
+                let hasChromeAPIInjection = existingScripts.contains { $0.source.contains("COMPLETE CHROME API BRIDGE SYSTEM") }
                 if !hasChromeAPIInjection {
                     // Get the extension ID for Chrome API injection
                     let extensionId = getExtensionId(for: extensionContext) ?? "unknown"
