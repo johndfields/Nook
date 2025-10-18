@@ -2264,8 +2264,10 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
                     // Get the extension ID for Chrome API injection
                     let extensionId = getExtensionId(for: extensionContext) ?? "unknown"
 
-                    // Generate Chrome API injection script for popup context
-                    let chromeAPIScript = generateChromeAPIInjectionScript(extensionId: extensionId, contextType: .popup)
+                    // CRITICAL: Use comprehensive Chrome API with port bridge support
+                    // This loads chrome-runtime-port-bridge.js which provides real Port objects
+                    // for runtime.connect() - DO NOT switch back to generateChromeAPIInjectionScript()
+                    let chromeAPIScript = generateCompleteChromeAPIScript(extensionId: extensionId, contextType: .popup)
 
                     let chromeAPIUserScript = WKUserScript(
                         source: chromeAPIScript,

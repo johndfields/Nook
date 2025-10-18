@@ -432,16 +432,35 @@ extension ExtensionManager {
 
     /// Load the Chrome Runtime Port Bridge script
     private func loadPortBridgeScript() -> String {
-        // Load from chrome-runtime-port-bridge.js file
-        guard let scriptURL = Bundle.main.url(forResource: "chrome-runtime-port-bridge", withExtension: "js", subdirectory: "Managers/ExtensionManager"),
-              let scriptContent = try? String(contentsOf: scriptURL, encoding: .utf8) else {
-            print("⚠️ [ExtensionManager+Runtime] Failed to load Port bridge script")
-            return "// Port bridge script not found"
+        print("FILE TEST::: Attempting to load chrome-runtime-port-bridge.js from bundle")
+        print("FILE TEST::: Bundle path: \(Bundle.main.bundlePath)")
+        
+        // Try with subdirectory first
+        if let scriptURL = Bundle.main.url(forResource: "chrome-runtime-port-bridge", withExtension: "js", subdirectory: "Managers/ExtensionManager") {
+            print("FILE TEST::: ✅ Found at: \(scriptURL.path)")
+            if let scriptContent = try? String(contentsOf: scriptURL, encoding: .utf8) {
+                print("FILE TEST::: ✅ Loaded (\(scriptContent.count) chars)")
+                return scriptContent
+            }
         }
-        return scriptContent
+        
+        // Try without subdirectory
+        if let scriptURL = Bundle.main.url(forResource: "chrome-runtime-port-bridge", withExtension: "js") {
+            print("FILE TEST::: ✅ Found at: \(scriptURL.path)")
+            if let scriptContent = try? String(contentsOf: scriptURL, encoding: .utf8) {
+                print("FILE TEST::: ✅ Loaded (\(scriptContent.count) chars)")
+                return scriptContent
+            }
+        }
+        
+        print("FILE TEST::: ❌ CRITICAL: Port bridge script NOT in bundle!")
+        print("⚠️ [ExtensionManager+Runtime] Failed to load Port bridge script")
+        return "// Port bridge script not found"
     }
 
     private func generateCompleteChromeAPIScript(extensionId: String, contextType: ChromeAPIContextType) -> String {
+        print("🔧 [ExtensionManager+Runtime] Using comprehensive Chrome API with port bridge support")
+        print("🔧 [ExtensionManager+Runtime] Extension ID: \(extensionId), Context: \(contextType)")
         let contextSpecificCode: String
         let additionalAPICode: String
 
