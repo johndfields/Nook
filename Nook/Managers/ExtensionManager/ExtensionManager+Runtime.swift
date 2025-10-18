@@ -646,6 +646,66 @@ extension ExtensionManager {
 
                     markAPIReady('runtime');
                 } else {
+                    // WebKit's native chrome.runtime exists, but we need to override connect() and sendMessage()
+                    // to fix "Tab not found" errors in popup contexts
+                    console.log('[Chrome Bridge] Overriding WebKit native runtime.connect() and sendMessage()');
+                    
+                    // Store original methods if they exist
+                    const originalConnect = chrome.runtime.connect;
+                    const originalSendMessage = chrome.runtime.sendMessage;
+                    
+                    // Force-override connect() to use our custom Port implementation
+                    chrome.runtime.connect = function(extensionIdOrConnectInfo, connectInfo) {
+                        console.log('[Chrome Bridge] Custom connect() called - bypassing WebKit native implementation');
+                        try {
+                            // Use the Port factory from chrome-runtime-port-bridge.js
+                            if (typeof window.createChromeRuntimePort === 'function') {
+                                return window.createChromeRuntimePort('\(extensionId)', extensionIdOrConnectInfo, connectInfo);
+                            } else {
+                                logError('Port factory not loaded - chrome-runtime-port-bridge.js missing');
+                                // Fallback to original if available
+                                if (originalConnect) {
+                                    return originalConnect.call(chrome.runtime, extensionIdOrConnectInfo, connectInfo);
+                                }
+                                return null;
+                            }
+                        } catch (error) {
+                            logError('chrome.runtime.connect override error: ' + error.message);
+                            return null;
+                        }
+                    };
+                    
+                    // Also override sendMessage for consistency
+                    chrome.runtime.sendMessage = function(message, callback) {
+                        console.log('[Chrome Bridge] Custom sendMessage() called');
+                        try {
+                            const messageData = {
+                                type: 'sendMessage',
+                                data: message,
+                                timestamp: Date.now().toString()
+                            };
+
+                            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.chromeRuntime) {
+                                window.webkit.messageHandlers.chromeRuntime.postMessage(messageData);
+
+                                if (callback) {
+                                    const messageId = messageData.timestamp;
+                                    window.chromeRuntimeCallbacks = window.chromeRuntimeCallbacks || {};
+                                    window.chromeRuntimeCallbacks[messageId] = callback;
+                                }
+                            } else {
+                                logError('chromeRuntime message handler not available');
+                            }
+                        } catch (error) {
+                            logError('chrome.runtime.sendMessage override error: ' + error.message);
+                        }
+                    };
+                    
+                    // Ensure ID is set
+                    if (!chrome.runtime.id) {
+                        chrome.runtime.id = '\(extensionId)';
+                    }
+                    
                     markAPIReady('runtime');
                 }
 
