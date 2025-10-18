@@ -70,13 +70,20 @@ extension ExtensionManager {
         }
         
         // Create Chrome runtime message format with sender info
+        // Note: Don't include tab info for popup contexts (popups don't run in tabs)
+        var senderInfo: [String: Any] = [
+            "id": extensionId,
+            "url": "webkit-extension://\(extensionId)/"
+        ]
+        
+        // Only include tab info if we're in a tab context (not popup)
+        if let tabInfo = getCurrentTabInfo() {
+            senderInfo["tab"] = tabInfo
+        }
+        
         let runtimeMessage: [String: Any] = [
             "id": messageId,
-            "sender": [
-                "id": extensionId,
-                "url": "webkit-extension://\(extensionId)/",
-                "tab": getCurrentTabInfo() as Any
-            ],
+            "sender": senderInfo,
             "data": messageData
         ]
         
