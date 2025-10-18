@@ -458,7 +458,7 @@ extension ExtensionManager {
         return "// Port bridge script not found"
     }
 
-    private func generateCompleteChromeAPIScript(extensionId: String, contextType: ChromeAPIContextType) -> String {
+    func generateCompleteChromeAPIScript(extensionId: String, contextType: ChromeAPIContextType) -> String {
         print("🔧 [ExtensionManager+Runtime] Using comprehensive Chrome API with port bridge support")
         print("🔧 [ExtensionManager+Runtime] Extension ID: \(extensionId), Context: \(contextType)")
         let contextSpecificCode: String
