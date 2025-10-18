@@ -725,6 +725,10 @@ extension ExtensionManager {
                         } catch (error) {
                             logError('chrome.runtime.sendMessage override error: ' + error.message);
                         }
+                        
+                        // Return true to indicate the response will be sent asynchronously
+                        // This prevents "unsupported type" errors and matches Chrome behavior
+                        return true;
                     };
                     
                     // Ensure ID is set
