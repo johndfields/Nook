@@ -434,6 +434,15 @@ public class Tab: NSObject, Identifiable, ObservableObject, WKDownloadDelegate {
         }
 
         print("Created WebView for tab: \(name)")
+
+        if #available(macOS 15.5, *) {
+            if let controller = ExtensionManager.shared.nativeController {
+                if _webView?.configuration.webExtensionController !== controller {
+                    _webView?.configuration.webExtensionController = controller
+                }
+            }
+        }
+
         // Inform extensions that this tab's view is now open/available BEFORE loading,
         // so content scripts and messaging can resolve this tab during early document phases
         if #available(macOS 15.5, *), didNotifyOpenToExtensions == false {
@@ -2091,6 +2100,17 @@ extension Tab: WKNavigationDelegate {
         print("💥 [Tab] didFailProvisionalNavigation for: \(webView.url?.absoluteString ?? "unknown")")
         print("   Error: \(error.localizedDescription)")
         loadingState = .didFailProvisionalNavigation(error)
+
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && (nsError.code == NSURLErrorNotConnectedToInternet || nsError.code == NSURLErrorNetworkConnectionLost || nsError.code == NSURLErrorResourceUnavailable) {
+            if let failedURL = nsError.userInfo[NSURLErrorFailingURLStringErrorKey] as? String,
+               let url = URL(string: failedURL) {
+                print("   🔧 [Tab] Detected potential CORS failure, requesting extension permissions...")
+                if #available(macOS 15.4, *) {
+                    ExtensionManager.shared.handleCORSFailure(for: url)
+                }
+            }
+        }
 
         // Set connection error favicon
         Task { @MainActor in
