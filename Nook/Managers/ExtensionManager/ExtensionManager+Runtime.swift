@@ -782,6 +782,10 @@ extension ExtensionManager {
                 \(generateAlarmsAPIScript(extensionId: extensionId))
                 markAPIReady('alarms');
 
+                // chrome.fontSettings API - Stub implementation for Dark Reader compatibility
+                \(generateFontSettingsAPIScript(extensionId: extensionId))
+                markAPIReady('fontSettings');
+
                 // Context-specific initialization
                 \(contextSpecificCode)
 

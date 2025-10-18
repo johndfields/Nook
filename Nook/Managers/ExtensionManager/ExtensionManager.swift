@@ -626,6 +626,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         let contextMenusScript = generateContextMenusAPIScript(extensionId: extensionId)
         let notificationsScript = generateNotificationsAPIScript(extensionId: extensionId)
         let commandsScript = generateCommandsAPIScript(extensionId: extensionId)
+        let fontSettingsScript = generateFontSettingsAPIScript(extensionId: extensionId)
 
         // Combine all API scripts
         let completeChromeAPIScript = """
@@ -649,6 +650,7 @@ final class ExtensionManager: NSObject, ObservableObject, WKWebExtensionControll
         console.log('[Chrome API Bridge] All Chrome APIs injected into existing tab');
 
         \(commandsScript)
+        \(fontSettingsScript)
         """
 
         // Create and inject the user script
